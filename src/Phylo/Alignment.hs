@@ -135,7 +135,16 @@ instance JSON ListAlignment where
 quickListAlignment :: [Name] -> [Sequence] -> ListAlignment
 quickListAlignment names sequences = ListAlignment names sequences (transpose sequences)
 
-safeListAlignment names sequences = removeAllGaps $ quickListAlignment names sequences
+saneAlignment (ListAlignment names sequences columns) = saneAlignment' names sequences columns
+saneAlignment' names sequences columns = hasDuplicate names
+hasDuplicate (x:y:z) | x==y = Just $ "Duplicate sequence identifier " ++ x
+                     | otherwise = hasDuplicate (y:z)
+hasDuplicate z = Nothing
+
+safeListAlignment names sequences = case (saneAlignment ans) of 
+                                        Just errmsg -> error errmsg
+                                        Nothing -> ans
+                                        where ans = removeAllGaps $ quickListAlignment names sequences
 
 fromColumnListAlignment :: [Name] -> [Column] -> ListAlignment
 fromColumnListAlignment names cols = ListAlignment names (transpose cols) cols
@@ -225,4 +234,12 @@ incompatibilities' (namex:namexs) (seqx:seqxs) (namey:nameys) (seqy:seqys)= case
 incompatibilities' [] [] [] [] = Nothing
 
 compatibleSeqs namex seqx namey seqy | namex /= namey = Just $ "incompatible alignments: " ++ " incompatible sequence names " ++ namex ++" != " ++ namey
-compatibleSeqs namex seqx namey seqy | (dropGap seqx) /= (dropGap seqy) = Just $ "incompatible alignments: sequence " ++ namex ++ " differs between two alignments"
+compatibleSeqs namex seqx namey seqy | (dropGap seqx) /= (dropGap seqy) = Just $ "incompatible alignments: sequence " ++ namex ++ " differs between two alignments " ++ difference where
+                                                                                difference = diffList (dropGap seqx) (dropGap seqy)
+                                                                                diffList x y | (length x) /= (length y) = " as they are different lengths (" ++ (show $ length x) ++" vs " ++ (show $ length y) ++")"
+                                                                                             | otherwise = diffList' x y 0
+                                                                                diffList' (x:xs) (y:ys) i | x==y = diffList' xs ys (i+1)
+                                                                                                          | otherwise = " as there is a different character at ungapped position " ++ (show i) ++ " ( " ++ (show x) ++ " vs " ++ (show y) ++ ")" 
+
+
+compatibleSeqs namex seqx namey seqy = Nothing
