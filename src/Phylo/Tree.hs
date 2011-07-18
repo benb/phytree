@@ -139,15 +139,15 @@ present :: Eq a => [a] -> a -> Bool
 present [] y = False
 present (x:xs) y = (x==y) || (present xs y)
 
-unrootedSplitsFor :: Node -> [String] -> HM.HashMap String Node
+unrootedSplitsFor :: Node -> [String] -> HM.Map String Node
 unrootedSplitsFor (Tree (Leaf name dist) node) list | present list name = splitsFor (Tree (Leaf name dist) node) list
 unrootedSplitsFor (Tree node (Leaf name dist)) list | present list name = splitsFor (Tree (Leaf name dist) node) list
 unrootedSplitsFor tree list = splitsFor (setOutgroup tree (head $ (names tree) \\ list)) list
 
-splitsFor :: Node -> [String] -> HM.HashMap String Node
+splitsFor :: Node -> [String] -> HM.Map String Node
 splitsFor node list = splitsFor' node HM.empty list
 
-splitsFor' :: Node -> HM.HashMap String Node -> [String] -> HM.HashMap String Node
+splitsFor' :: Node -> HM.Map String Node -> [String] -> HM.Map String Node
 splitsFor' root startMap [] = startMap
 splitsFor' root startMap remaining | (sort (names root)) == remaining = foldl' (\hash key -> HM.insert key root hash) startMap remaining
 
