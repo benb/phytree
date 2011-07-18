@@ -2,6 +2,8 @@ module Phylo.Alignment.Parsers where
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.List
 import Data.Char
+import Control.Applicative
+import Debug.Trace
 
 --This parser has been briefly tested to work with the "relaxed" phylip format
 --It is intended to handle interleaved and sequential versions, but relies on spaces between 
@@ -10,8 +12,6 @@ import Data.Char
 parsePhylip :: Monad m =>  [L.ByteString] -> m [(String,String)]
 parsePhylip = parsePhylipHeader
 parsePhylipHeader :: Monad m => [L.ByteString] -> m [(String,String)]
-parsePhylipBody :: Bool -> Int -> Int -> [(L.ByteString,L.ByteString)] -> [L.ByteString] -> [(String,String)]
-parsePhylipBody' :: [L.ByteString] -> [(L.ByteString,L.ByteString)] -> [(L.ByteString,L.ByteString)] -> [(String,String)]
 
 
 parsePhylipHeader (x:xs)  = (case (ans,nChar) of
@@ -19,53 +19,51 @@ parsePhylipHeader (x:xs)  = (case (ans,nChar) of
                                 _ -> fail "Can't parse alignment") where
                                 header = L.dropWhile (==' ') x
                                 t1 = L.readInt header
-                                nTaxa = fmap fst t1
-                                t2 = fmap snd t1 >>= L.readInt . L.dropWhile  (==' ')
-                                nChar = fmap fst t2
-                                filteredxs = filter (\x->L.empty /= (L.filter (/=' ') x)) xs
-                                ans = fmap (\x -> parsePhylipBody False x x [] filteredxs) nTaxa
+                                nTaxa = fst <$> t1
+                                t2 = snd <$> t1 >>= L.readInt . L.dropWhile isSpace
+                                nChar = fst <$> t2
+                                filteredxs = filter (\x->L.empty /= (L.filter (not . isSpace) x)) xs
+                                ans = ((parseBeginPhylipBody filteredxs) <$> nTaxa <*> nChar)
 
---parsePhylipBody nTaxa remaining output xs | trace ((show nTaxa) ++ " " ++ (show remaining) ++ " " ++ (show $  length xs) ++ (show (take 1 xs)) ++ (show output)) False  = undefined
-parsePhylipBody True nTaxa 0 output xs =  parsePhylipBody' [] [] $ reverse finoutput where
-                                                                finoutput = (name,seq):(tail output)
-                                                                (name,seq1) = head output
-                                                                seq=appendall seq1 xs
-                                                                appendall a [] = a
-                                                                appendall a (y:ys) = appendall (a `L.append` (L.filter (/=' ') y)) ys
-                                                                
-parsePhylipBody False nTaxa 0 output xs =  parsePhylipBody' xs [] $ reverse output
---new sequence
-parsePhylipBody sequential nTaxa remaining output (x:xs) | (L.head x) /= ' ' && notseen x output = parsePhylipBody sequential nTaxa (remaining-1) ((name,seq):output) xs where
-                                                                                                                (name,remainder) = L.break (==' ') x
-                                                                                                                seq = L.filter (/=' ') remainder
 
---seen before, append to previous seq
-parsePhylipBody sequential nTaxa remaining output (x:xs) | (L.head x) /= ' ' = parsePhylipBody sequential nTaxa remaining output (droppedx:xs) where
-                                                                               (_,droppedx)=L.break(==' ') x
+deByteString :: [(L.ByteString,L.ByteString)] -> [(String,String)]
+deByteString = map (\(x,y) -> (L.unpack x,L.unpack$ L.filter (not . isSpace ) y))
+parseBeginPhylipBody :: [L.ByteString] -> Int -> Int -> [(String,String)]
+{-parseBeginPhylipBody (line:lines) nTaxa nChar | trace "OK1" False  = map (\(x,y) -> (L.unpack x,L.unpack y)) (parsePamlBody (line:lines) nTaxa nChar)-}
+parseBeginPhylipBody (line:lines) nTaxa nChar | isPaml line = deByteString $ parsePamlBody (line:lines) nTaxa nChar
+parseBeginPhylipBody (line:line2:lines) nTaxa nChar | isSequential (line,line2) = deByteString $ parseSeqPhylipBody (line:line2:lines) nTaxa nChar 
+parseBeginPhylipBody (line:line2:lines) nTaxa nChar | isInterleaved (line,line2) = deByteString $ parseInterPhylipBody (line:line2:lines) nTaxa nChar 
 
---no name so seen before
-parsePhylipBody sequential nTaxa remaining output (x:xs)         = parsePhylipBody True nTaxa remaining ((name,seq):(tail output)) xs where
-                                                                                (name,seq1) = head output
-                                                                                seq=seq1 `L.append` (L.filter(/=' ') x)
-notseen:: L.ByteString -> [(L.ByteString,L.ByteString)] -> Bool
-notseen line previous = not $ any (name==) names where
-                                names = map fst previous
-                                (name,_) = L.break (==' ') line
-                                             
---params are (remaining lines) (output stack 1) (output stack 2)
---we are finished:
-parsePhylipBody' [] top [] = map (\(x,y) -> (L.unpack x,L.unpack y)) $ reverse top 
-parsePhylipBody' [] [] out = map (\(x,y) -> (L.unpack x,L.unpack y)) $ out
+isPaml line = 1 == (length $ (filter (not . L.null) (L.split ' ' line)))
+isSequential (line1,line2) = isSpace $ L.head line2
+isInterleaved (line1,line2) = not $ isSpace $ L.head line2
 
---loop next set of sequences
-parsePhylipBody' (x:xs) top [] = parsePhylipBody' (x:xs) [] $ reverse top
+parsePamlBody :: [L.ByteString] -> Int -> Int -> [(L.ByteString,L.ByteString)]
+{-parsePamlBody a b c | trace "OK" False = undefined-}
+parsePamlBody lines 0 nChar  = [] 
+parsePamlBody (line:lines) nTaxa nChar = sequence : parsePamlBody ltail (nTaxa-1) nChar where
+                                       (name,remainder) = L.break isSpace line
+                                       (seq,ltail) = getSeq nChar (remainder:lines) L.empty
+                                       sequence = (name,seq)
+parseSeqPhylipBody = parsePamlBody
 
---append x to sequence seq and push onto top
-parsePhylipBody' (x:xs) top ((name,seq):ys) = parsePhylipBody' xs ((name,seq `L.append` (cleanup x)):top) ys where
-                                                                            -- remove (repeated) name if present 
-                                                                cleanup str | L.head str /=' ' = cleanup $ snd $ L.break (==' ') str
-                                                                            | otherwise = L.filter(/=' ') str
+getSeq :: Int -> [L.ByteString] -> L.ByteString -> (L.ByteString,[L.ByteString])
+{-getSeq nChar lines seq | trace ((show nChar) ++ "\n" ++ (show (map L.unpack lines)) ++"\n" ++ (show $ L.unpack seq)) False = undefined-}
+getSeq nChar lines seq | nChar < 0 = error "Failed to parse file"
+getSeq 0 lines seq= (seq,lines)
+getSeq nChar (line:xs) seq = getSeq (nChar- (fromIntegral len)) (xs) (seq `L.append` seq2) where
+                                    seq2 = L.filter (not . isSpace) line
+                                    len = L.length seq2
+                                
 
+{-parseInterPhylipBody lines nTaxa nChar | trace "Inter" False = undefined-}
+parseInterPhylipBody lines nTaxa nChar = addLines lastLines $ firstInterPass firstLines where
+                                                (firstLines,lastLines) = splitAt nTaxa lines
+                                                firstInterPass =  map (L.break isSpace)
+                                                addLines [] destination = destination
+                                                addLines lines destination = addLines remainder $  map (\(seq2,(name,seq1)) -> (name,seq1 `L.append` seq2)) $ zip firstLines destination where
+                                                                (firstLines,remainder) = splitAt nTaxa lines
+                                                                                
 
 
 
