@@ -144,7 +144,7 @@ hasDuplicate z = Nothing
 safeListAlignment names sequences = case (saneAlignment ans) of 
                                         Just errmsg -> error errmsg
                                         Nothing -> ans
-                                        where ans = removeAllGaps $ quickListAlignment names sequences
+                                        where ans = removeAllGaps $ quickListAlignment names (map (map toUpper) sequences)
 
 fromColumnListAlignment :: [Name] -> [Column] -> ListAlignment
 fromColumnListAlignment names cols = ListAlignment names (transpose cols) cols
