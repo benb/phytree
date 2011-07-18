@@ -216,9 +216,13 @@ numberifyGapTree tree aln = transpose $ nfy (columns aln) where
 compatible :: Node -> ListAlignment -> Bool
 compatible tree aln = (sort $ Tree.names tree) == names aln
 
-compatibleAlignments :: ListAlignment -> ListAlignment -> Bool
-compatibleAlignments x y = (names x == names y) && (or $ map compatSeq $ zip (sequences x) (sequences y)) where
-                               compatSeq ((x:xs),ys) | isGapChar x = compatSeq (xs,ys)
-                               compatSeq (xs,(y:ys)) | isGapChar y = compatSeq (xs,ys)
-                               compatSeq ((x:xs),(y:ys)) = (toUpper x)==(toUpper y) && compatSeq (xs,ys)
-                               compatSeq ([],[]) = True
+incompatibilities :: ListAlignment -> ListAlignment -> Maybe String
+incompatibilities x y | (length $names x) > (length $ names y) = Just $ "incompatible alignments: first alignment has " ++ (show $ length $ names x) ++ " sequences, second has " ++ (show $ length $ names y)
+incompatibilities (ListAlignment namesx seqsx colsx) (ListAlignment namesy seqsy colsy)  = incompatibilities' namesx seqsx namesy seqsy
+incompatibilities' (namex:namexs) (seqx:seqxs) (namey:nameys) (seqy:seqys)= case compatibleSeqs namex seqx namey seqy of 
+                                                                                        (Just str) -> Just str
+                                                                                        Nothing -> incompatibilities' namexs seqxs nameys seqys
+incompatibilities' [] [] [] [] = Nothing
+
+compatibleSeqs namex seqx namey seqy | namex /= namey = Just $ "incompatible alignments: " ++ " incompatible sequence names " ++ namex ++" != " ++ namey
+compatibleSeqs namex seqx namey seqy | (dropGap seqx) /= (dropGap seqy) = Just $ "incompatible alignments: sequence " ++ namex ++ " differs between two alignments"
