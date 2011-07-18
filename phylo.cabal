@@ -1,5 +1,5 @@
 Name:           phytree
-Version:        0.2
+Version:        0.3
 Cabal-Version:  >= 1.2
 License:        BSD3
 Author:         Benjamin Blackburne
@@ -14,4 +14,4 @@ Build-Type:     Simple
 library
         Exposed-Modules: Phylo.Tree, Phylo.Alignment.Parsers, Phylo.Alignment
         HS-Source-Dirs: src
-        Build-Depends: json>=0.4, parallel>=3.1.0.1, statistics>=0.8.0.5, bytestring >= 0.9.0.0, parsec >= 2.1.0 && < 3.0.0, mtl >= 1.1.0.2, hashmap >= 1.1.0, QuickCheck>=2.4.0.1, containers >= 0.3.0.0, base >= 3
+        Build-Depends: json>=0.4, bytestring >= 0.9.0.0, parsec >= 2.1.0 && < 3.0.0, mtl >= 1.1.0.2, hashmap >= 1.1.0, QuickCheck>=2.4.0.1,  base >= 3
