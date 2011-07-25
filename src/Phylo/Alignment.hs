@@ -25,10 +25,12 @@ parseAlignmentFile :: Monad m => ([L.ByteString] -> m [(String,String)]) -> Stri
 parseAlignmentFile parser name = parseAlignmentString parser `liftM` (L.readFile name)
 
 parseUniversal :: Monad m => [L.ByteString] -> m [(String,String)]
+parseUniversal [] = error "Empty alignment file"
 parseUniversal (x:xs) = case x of 
                               str | str==L.empty -> parseUniversal xs
                                   | L.isPrefixOf (L.pack ">") str -> parseFasta (x:xs)
                                   | otherwise -> parsePhylip(x:xs)
+
 
                                 
 
@@ -225,21 +227,27 @@ numberifyGapTree tree aln = transpose $ nfy (columns aln) where
 compatible :: Node -> ListAlignment -> Bool
 compatible tree aln = (sort $ Tree.names tree) == names aln
 
-incompatibilities :: ListAlignment -> ListAlignment -> Maybe String
-incompatibilities x y | (length $names x) > (length $ names y) = Just $ "incompatible alignments: first alignment has " ++ (show $ length $ names x) ++ " sequences, second has " ++ (show $ length $ names y)
-incompatibilities (ListAlignment namesx seqsx colsx) (ListAlignment namesy seqsy colsy)  = incompatibilities' namesx seqsx namesy seqsy
-incompatibilities' (namex:namexs) (seqx:seqxs) (namey:nameys) (seqy:seqys)= case compatibleSeqs namex seqx namey seqy of 
-                                                                                        (Just str) -> Just str
-                                                                                        Nothing -> incompatibilities' namexs seqxs nameys seqys
-incompatibilities' [] [] [] [] = Nothing
+-- Incompat describes an incompatability between two alignments
+-- The boolean value describes whether an incompatability 
+-- renders comparison impossible (i.e. different symbols can be ignored to make
+-- a comparison, different lengths cannot ) 
+newtype Incompat = Incompat (Bool,String) 
 
-compatibleSeqs namex seqx namey seqy | namex /= namey = Just $ "incompatible alignments: " ++ " incompatible sequence names " ++ namex ++" != " ++ namey
-compatibleSeqs namex seqx namey seqy | (dropGap seqx) /= (dropGap seqy) = Just $ "incompatible alignments: sequence " ++ namex ++ " differs between two alignments " ++ difference where
-                                                                                difference = diffList (dropGap seqx) (dropGap seqy)
-                                                                                diffList x y | (length x) /= (length y) = " as they are different lengths (" ++ (show $ length x) ++" vs " ++ (show $ length y) ++")"
-                                                                                             | otherwise = diffList' x y 0
-                                                                                diffList' (x:xs) (y:ys) i | x==y = diffList' xs ys (i+1)
-                                                                                                          | otherwise = " as there is a different character at ungapped position " ++ (show i) ++ " ( " ++ (show x) ++ " vs " ++ (show y) ++ ")" 
+incompatibilities :: ListAlignment -> ListAlignment -> [Incompat]
+incompatibilities  (ListAlignment namesx seqsx colsx) (ListAlignment namesy seqsy colsy) | (length namesx) > (length namesy) = (Incompat (True,"incompatible alignments: first alignment has " ++ (show $ length $ namesx) ++ " sequences, second has " ++ (show $ length $ namesy))) : (incompatibilities' namesx seqsx namesy seqsy [])
+incompatibilities (ListAlignment namesx seqsx colsx) (ListAlignment namesy seqsy colsy) = incompatibilities' namesx seqsx namesy seqsy [] 
+incompatibilities' (namex:namexs) (seqx:seqxs) (namey:nameys) (seqy:seqys) incompat = incompatibilities' namexs seqxs nameys seqys $ compatibleSeqs namex seqx namey seqy incompat
 
+incompatibilities' [] [] [] [] incompat = incompat 
 
-compatibleSeqs namex seqx namey seqy = Nothing
+compatibleSeqs namex seqx namey seqy incompat | namex /= namey = (Incompat(True,"incompatible alignments: " ++ " incompatible sequence names " ++ namex ++" != " ++ namey)) : incompat
+compatibleSeqs namex seqx namey seqy incompat = compatibleSeqs' namex (dropGap seqx) (dropGap seqy) 0 incompat 
+
+compatibleSeqs' :: String -> String -> String -> Int -> [Incompat] -> [Incompat]
+compatibleSeqs' namex (x:seqx) (y:seqy) pos incompat | x/=y = compatibleSeqs' namex seqx seqy (pos+1) ((Incompat (False,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments " ++ difference)):incompat)  where
+                                                                          difference = " as there is a different character at ungapped position " ++ (show pos) ++ " ( " ++ (show x) ++ " vs " ++ (show y) ++ ")" 
+compatibleSeqs' namex (x:seqx) (y:seqy) pos incompat = compatibleSeqs' namex seqx seqy (pos+1) incompat
+compatibleSeqs' namex (x:seqx) [] pos incompat = (Incompat (True,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments as they have different lengths ( " ++ (show (pos + (length seqx))) ++ " vs " ++ (show pos) ++ ")"))  : incompat
+compatibleSeqs' namex [] (y:seqy) pos incompat = (Incompat (True,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments as they have different lengths ( " ++ (show pos) ++ " vs " ++ (show (pos + (length seqy))) ++ ")"))  : incompat
+compatibleSeqs' namex [] [] pos incompat = incompat
+
