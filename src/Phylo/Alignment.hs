@@ -9,6 +9,7 @@ import Data.Char
 import Debug.Trace
 import qualified Data.HashMap as HM
 import Text.JSON
+import Data.Maybe
 
 
 
@@ -250,4 +251,22 @@ compatibleSeqs' namex (x:seqx) (y:seqy) pos incompat = compatibleSeqs' namex seq
 compatibleSeqs' namex (x:seqx) [] pos incompat = (Incompat (True,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments as they have different lengths ( " ++ (show (pos + (length seqx))) ++ " vs " ++ (show pos) ++ ")"))  : incompat
 compatibleSeqs' namex [] (y:seqy) pos incompat = (Incompat (True,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments as they have different lengths ( " ++ (show pos) ++ " vs " ++ (show (pos + (length seqy))) ++ ")"))  : incompat
 compatibleSeqs' namex [] [] pos incompat = incompat
+
+
+scaledAAFrequencies = scaledFrequencies "ARNDCQEGHILKMFPSTWYV"
+scaledFrequencies :: [Char] -> ListAlignment -> [Double]
+scaledFrequencies wanted aln = map (\i-> (fromIntegral i)/total) rawfreq where
+                               total = fromIntegral $ foldr (+) 0 rawfreq
+                               rawfreq = frequencies wanted aln
+
+
+frequencies :: [Char] -> ListAlignment -> [Int]
+frequencies wanted aln = ans where
+                          hm = foldr (\k h -> HM.insert k 0 h) HM.empty wanted
+                          hm2 = frequencies' hm (sequences aln)
+                          ans = map (\k -> fromJust $ HM.lookup k hm2) wanted
+frequencies' hm ((x:xs):xxs) = frequencies' hm2 (xs:xxs) where
+                                hm2 = HM.update (\x -> Just $ x+1) x hm
+frequencies' hm ([]:xxs) = frequencies' hm xxs
+frequencies' hm ([]) = hm
 
