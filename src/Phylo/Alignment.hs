@@ -92,6 +92,20 @@ sortAlignment (ListAlignment names seqs cols) = ListAlignment names (transpose a
                                                   reordered = bsort numbCols
                                                   ans = map (map fst) (map coldata reordered)
 
+sortAlignmentBySeq (ListAlignment names seqs cols) = sortByName $ sortAlignment aln2 where
+                                                                aln2 = ListAlignment newnames newseqs newcols 
+                                                                (newnames,newseqs) = unzip $ sortBy (\(a,b) (c,d) -> compare (removeGaps b) (removeGaps d)) (zip names seqs)
+                                                                removeGaps (x:xs) | isGapChar x = removeGaps xs
+                                                                                  | otherwise = x:(removeGaps xs)
+                                                                newcols = transpose newseqs
+
+sortByName (ListAlignment names seqs cols) = ListAlignment newnames newseqs (transpose newseqs) where
+                                                 (newnames,newseqs) = unzip $ sortBy (\(a,b) (c,d) -> compare a c) $ zip names seqs 
+
+                                                        
+
+
+
 gapPos :: Sequence -> [(Int,Int)]
 gapPos s = gapPos' s [] Nothing 0
 
