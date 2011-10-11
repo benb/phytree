@@ -97,6 +97,7 @@ sortAlignmentBySeq (ListAlignment names seqs cols) = sortByName $ sortAlignment 
                                                                 (newnames,newseqs) = unzip $ sortBy (\(a,b) (c,d) -> compare (removeGaps b) (removeGaps d)) (zip names seqs)
                                                                 removeGaps (x:xs) | isGapChar x = removeGaps xs
                                                                                   | otherwise = x:(removeGaps xs)
+                                                                removeGaps [] = []
                                                                 newcols = transpose newseqs
 
 sortByName (ListAlignment names seqs cols) = ListAlignment newnames newseqs (transpose newseqs) where
