@@ -70,7 +70,7 @@ parseInterPhylipBody lines nTaxa nChar = addLines lastLines $ firstInterPass fir
 --Fasta format
 parseFasta' :: [(String,String)] -> [L.ByteString] -> [(String,String)]
 --this is an inefficient way to check that this alignment will be valid
-parseFasta' ((name,""):(name2,seq2):(name3,seq3):xs) bs | (length seq2) /= (length seq3) = error $ "lengths of sequences " ++ name2 ++ " and " ++ name3 ++ " don't match"
+parseFasta' ((name,""):(name2,seq2):(name3,seq3):xs) bs | (length seq2) /= (length seq3) = error $ "lengths of sequences " ++ name2 ++ " (" ++ (show $ length seq2) ++ ") " ++ " and " ++ name3 ++ " (" ++ (show $length seq3) ++ ") don't match"
 parseFasta' old [] =  old
 parseFasta' old bs =  case L.unpack (L.take 1 (head bs)) of 
                       ['>'] -> parseFasta' ((trim $ L.unpack (L.drop 1 (head bs)),"") : old) $ tail bs

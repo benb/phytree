@@ -8,9 +8,9 @@ Build-Type:     Simple
 --Executable dist
  --       Main-Is: Dist.hs
  --       HS-Source-Dirs: src
---Executable homdist
---        Main-Is: HomDist.hs
---       HS-Source-Dirs: src
+Executable prunetree
+        Main-Is: Prune.hs
+       HS-Source-Dirs: src
 library
         Exposed-Modules: Phylo.Tree, Phylo.Alignment.Parsers, Phylo.Alignment
         HS-Source-Dirs: src

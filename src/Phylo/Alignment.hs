@@ -263,8 +263,8 @@ compatibleSeqs' :: String -> String -> String -> Int -> [Incompat] -> [Incompat]
 compatibleSeqs' namex (x:seqx) (y:seqy) pos incompat | x/=y = compatibleSeqs' namex seqx seqy (pos+1) ((Incompat (False,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments " ++ difference)):incompat)  where
                                                                           difference = " as there is a different character at ungapped position " ++ (show pos) ++ " ( " ++ (show x) ++ " vs " ++ (show y) ++ ")" 
 compatibleSeqs' namex (x:seqx) (y:seqy) pos incompat = compatibleSeqs' namex seqx seqy (pos+1) incompat
-compatibleSeqs' namex (x:seqx) [] pos incompat = (Incompat (True,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments as they have different lengths ( " ++ (show (pos + (length seqx))) ++ " vs " ++ (show pos) ++ ")"))  : incompat
-compatibleSeqs' namex [] (y:seqy) pos incompat = (Incompat (True,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments as they have different lengths ( " ++ (show pos) ++ " vs " ++ (show (pos + (length seqy))) ++ ")"))  : incompat
+compatibleSeqs' namex (x:seqx) [] pos incompat = (Incompat (True,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments as they have different lengths ( " ++ (show (pos + (length seqx) + 1)) ++ " vs " ++ (show pos) ++ ")"))  : incompat
+compatibleSeqs' namex [] (y:seqy) pos incompat = (Incompat (True,"incompatible alignments: sequence " ++ namex ++ " differs between two alignments as they have different lengths ( " ++ (show pos) ++ " vs " ++ (show (pos + (length seqy) + 1)) ++ ")"))  : incompat
 compatibleSeqs' namex [] [] pos incompat = incompat
 
 

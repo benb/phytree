@@ -3,7 +3,7 @@ import Text.ParserCombinators.Parsec hiding (many, optional, (<|>))
 import Control.Applicative hiding ((<|>))
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Prim
-import Numeric (readFloat, readHex, readSigned)
+import Numeric (readInt, readFloat, readHex, readSigned)
 import Text.ParserCombinators.Parsec.Token
 import Text.ParserCombinators.Parsec.Language
 import qualified Data.HashMap as HM
@@ -93,7 +93,9 @@ number = do s <- getInput
             case readSigned readFloat s of
               [(n, s')] -> n <$ setInput s'
               _         -> fail "empty"
-            
+intNumber :: Parser Int
+intNumber = do{ x <- many1 digit;
+             return (read x) }
 
 parseLeaf :: Parser PNode
 parseLeaf = do name <- nodeName
@@ -160,4 +162,72 @@ splitsFor' (INode left right dist) startMap remaining = (go left right (go right
 
 splitsFor' leaf startMap remaining = error $ "Tree and Alignment are not congruent: Can't find leaf " ++ (head (remaining \\ (names leaf))) ++ " in tree"
 
+--- allow branch labelling
+
+data PLNode = PLLeaf String Double Int | PLNode [PLNode] Double Int | PLTree [PLNode] deriving Show
+parseLLeaf :: Parser PLNode
+parseLLeaf = do name <- nodeName
+                string ":"
+                len <- number
+                string "#"
+                id <- intNumber
+                return (PLLeaf name len id)
+
+parseLINode :: Parser PLNode
+parseLINode = do nodes <- parseGenLINode 
+                 string ":"
+                 len <- number
+                 string "#"
+                 id <- intNumber
+                 return (PLNode nodes len id)
+
+parseLTree :: Parser PLNode
+parseLTree = do nodes <- parseGenLINode
+                option "" $ string ":0.0" --RAxML sticks branch lengths on the root...!
+                string ";"
+                return (PLTree nodes)
+
+parseGenLINode :: Parser [PLNode]
+parseGenLINode = do string "("
+                    fst <- try (parseLINode) <|> parseLLeaf
+                    string ","
+                    remainder <- parseLNodeList
+                    string ")"
+                    return (fst:remainder)
+
+parseLNodeList :: Parser [PLNode]
+parseLNodeList = sepBy1 (try (parseLINode) <|> parseLLeaf) (char ',')
+
+toNewickL :: PLNode -> String
+toNewickL (PLTree nodes) = "(" ++ (toNewickL' nodes) ++ ");" 
+toNewickL (PLNode nodes dist id) = "(" ++ toNewickL' nodes ++"):" ++ (show dist) ++"#" ++ (show id)
+toNewickL (PLLeaf name dist id) = name ++":" ++ (show dist) ++"#" ++ (show id)
+toNewickL' nodes = join $ intersperse "," $ map toNewickL nodes
+
+prune :: [String] -> PLNode -> PLNode 
+mapPrune :: [String] -> [PLNode] -> [PLNode]
+mapPrune _ [] = []
+mapPrune list (leaf@(PLLeaf name _ _):xs) | Nothing /= (find (==name) list) = leaf:(mapPrune list xs)
+                                          | otherwise  = mapPrune list xs
+mapPrune list (iNode@(PLNode nodes dist id):xs) = case (PLNode (mapPrune list nodes) dist id) of 
+                                                        ans@(PLNode (_:_:_) _ _ ) -> ans:(mapPrune list xs)
+                                                        ans@(PLNode ((PLLeaf name dist id):[]) dist' id') -> (PLLeaf name (dist +dist') id):(mapPrune list xs) -- not sure what id to use
+                                                        ans@(PLNode ((PLNode nodes dist id):[]) dist' id') -> (PLNode nodes (dist +dist') id):(mapPrune list xs) -- not sure what id to use
+                                                        ans@(PLNode [] _ _ ) -> mapPrune list xs
+prune list (PLTree nodes) = PLTree nodes' where
+                                nodes'' = mapPrune list nodes
+                                nodes' = case nodes'' of
+                                              [PLNode nodes dist id] -> nodes
+                                              x -> x
+
+readLNewickTree :: String -> Either String PLNode
+readLNewickTree x = case (parse parseLTree "" x) of
+                        Right t -> Right t
+                        Left err -> Left $ show err
+
+unrootL tree@(PLTree (x:y:z:[])) = tree
+unrootL tree@(PLTree ((PLNode nodes dist id):(PLNode nodes' dist' id'):[])) = PLTree ((PLNode nodes' (dist + dist') id):nodes)
+unrootL tree@(PLTree ((PLNode nodes dist id):(PLLeaf name dist' id'):[])) = PLTree ((PLLeaf name (dist + dist') id):nodes)
+unrootL tree@(PLTree ((PLLeaf name dist' id):(PLNode nodes dist id'):[])) = PLTree ((PLLeaf name (dist + dist') id):nodes)
+unrootL tree = tree
 
