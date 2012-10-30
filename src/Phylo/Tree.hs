@@ -141,9 +141,14 @@ present :: Eq a => [a] -> a -> Bool
 present [] y = False
 present (x:xs) y = (x==y) || (present xs y)
 
+-- dollo parsimony
+-- given a list of leaf nodes of state 0
+-- return a map of the parsimonious branches 
+-- where 1->0 transition has taken place
+-- (after rerooting the tree so the root has state 1)
 unrootedSplitsFor :: Node -> [String] -> HM.Map String Node
-unrootedSplitsFor (Tree (Leaf name dist) node) list | present list name = splitsFor (Tree (Leaf name dist) node) list
-unrootedSplitsFor (Tree node (Leaf name dist)) list | present list name = splitsFor (Tree (Leaf name dist) node) list
+unrootedSplitsFor (Tree (Leaf name dist) node) list | not $ present list name = splitsFor (Tree (Leaf name dist) node) list
+unrootedSplitsFor (Tree node (Leaf name dist)) list | not $ present list name = splitsFor (Tree (Leaf name dist) node) list
 unrootedSplitsFor tree list = splitsFor (setOutgroup tree (head $ (names tree) \\ list)) list
 
 splitsFor :: Node -> [String] -> HM.Map String Node
@@ -151,7 +156,7 @@ splitsFor node list = splitsFor' node HM.empty list
 
 splitsFor' :: Node -> HM.Map String Node -> [String] -> HM.Map String Node
 splitsFor' root startMap [] = startMap
-splitsFor' root startMap remaining | (sort (names root)) == remaining = foldl' (\hash key -> HM.insert key root hash) startMap remaining
+splitsFor' root startMap remaining | (sort (names root)) == (sort remaining) = foldl' (\hash key -> HM.insert key root hash) startMap remaining
 
 splitsFor' (Tree left right) startMap remaining = (go left right (go right left startMap)) where
                                                      go l r map = splitsFor' l map reduced where
