@@ -43,12 +43,12 @@ treeLength (INode l r dist) = (treeLength l) + (treeLength r) + dist
 treeLength (Leaf name dist) = dist
 
 leaves :: Node -> [Node]
-leaves = traverse []
+leaves = phyTraverse []
 
-traverse :: [Node] -> Node -> [Node]
-traverse init (INode l r dist) = traverse (traverse init r) l 
-traverse init (Tree l r) = traverse (traverse init r) l 
-traverse init x = x : init
+phyTraverse :: [Node] -> Node -> [Node]
+phyTraverse init (INode l r dist) = phyTraverse (phyTraverse init r) l 
+phyTraverse init (Tree l r) = phyTraverse (phyTraverse init r) l 
+phyTraverse init x = x : init
 
 setOutgroup :: Node -> String -> Node
 setOutgroup (Tree (Leaf leaf1Name dist)  right) name  | leaf1Name==name = Tree (Leaf leaf1Name dist) right
